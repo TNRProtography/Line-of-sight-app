@@ -1,0 +1,6 @@
+{
+  "name": "Line of Sight Analyzer",
+  "description": "An interactive map tool to visualize the line of sight between two points, considering terrain elevation, antenna heights, and the Earth's curvature. It highlights areas where the line of sight might be obstructed.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
