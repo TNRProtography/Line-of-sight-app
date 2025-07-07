@@ -6,7 +6,6 @@ import ResultDisplay from './components/ResultDisplay';
 import type { LOSResult, TerrainPoint, ConstraintPoint, RadioSpecs, RadioLinkResult } from './types';
 
 const App: React.FC = () => {
-    // ... all of your state and handlers remain exactly the same ...
     const [points, setPoints] = useState<[LatLng | null, LatLng | null]>([null, null]);
     const [antennaHeights, setAntennaHeights] = useState<[number, number]>([10, 10]);
     const [radioSpecs, setRadioSpecs] = useState<RadioSpecs>({
@@ -26,7 +25,9 @@ const App: React.FC = () => {
     const [constraintSegments, setConstraintSegments] = useState<ConstraintPoint[][]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
-    const [hoveredDistance, setHoveredDistance] = useState<number | null>(null);
+    
+    // --- FIX: All hover-related state and memos have been removed from here ---
+    // This stops the re-render loop that caused flickering.
 
     const handleMapClick = useCallback((latlng: LatLng) => {
         if (losResult) {
@@ -69,227 +70,109 @@ const App: React.FC = () => {
         setRadioLinkResult(null);
         setConstraintSegments([]);
         setError(null);
-        setHoveredDistance(null);
+        // --- FIX: Removed hoveredDistance reset ---
         setUseRadioSpecs(false);
         setUseCurvature(true);
     }, []);
 
-    const handleHover = useCallback((distance: number | null) => {
-        setHoveredDistance(distance);
-    }, []);
-    
-    const hoveredLatLng = useMemo(() => {
-        if (hoveredDistance === null || !points[0] || !points[1]) {
-            return null;
-        }
-        const totalDistance = points[0].distanceTo(points[1]);
-        if (totalDistance === 0) return points[0];
-    
-        const fraction = hoveredDistance / totalDistance;
-        const safeFraction = Math.max(0, Math.min(1, fraction));
-        
-        const lat = points[0].lat + (points[1].lat - points[0].lat) * safeFraction;
-        const lng = points[0].lng + (points[1].lng - points[0].lng) * safeFraction;
-        return new LatLng(lat, lng);
-    }, [hoveredDistance, points]);
+    // --- FIX: handleHover function removed ---
 
     const getCurvatureHeight = useCallback((distance: number, totalDistance: number): number => {
         if (!useCurvature || totalDistance === 0) return 0;
-        
-        const R_e = 6371000;
-        const K = 4 / 3;
-        const effectiveRadius = R_e * K;
-    
-        const d1 = distance;
-        const d2 = totalDistance - d1;
-    
-        return (d1 * d2) / (2 * effectiveRadius);
+        const R_e = 6371000 * (4 / 3);
+        return (distance * (totalDistance - distance)) / (2 * R_e);
     }, [useCurvature]);
 
     const fetchTerrainProfile = async (start: LatLng, end: LatLng, steps: number = 100): Promise<{ profile: TerrainPoint[], totalDistance: number }> => {
-        const locations = [];
-        for (let i = 0; i <= steps; i++) {
+        const locations = Array.from({ length: steps + 1 }, (_, i) => {
             const fraction = i / steps;
-            const lat = start.lat + (end.lat - start.lat) * fraction;
-            const lng = start.lng + (end.lng - start.lng) * fraction;
-            locations.push({ latitude: lat, longitude: lng });
-        }
-    
-        const response = await fetch('https://api.open-elevation.com/api/v1/lookup', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({ locations }),
+            return { latitude: start.lat + (end.lat - start.lat) * fraction, longitude: start.lng + (end.lng - start.lng) * fraction };
         });
-    
-        if (!response.ok) {
-            throw new Error(`Failed to fetch elevation data (status: ${response.status})`);
-        }
-    
+        const response = await fetch('https://api.open-elevation.com/api/v1/lookup', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ locations }) });
+        if (!response.ok) throw new Error(`Failed to fetch elevation data (status: ${response.status})`);
         const data = await response.json();
-        if (!data.results || data.results.length === 0) {
-            throw new Error("Invalid elevation data received from API.");
-        }
-    
+        if (!data.results || data.results.length === 0) throw new Error("Invalid elevation data received from API.");
         const totalDistance = start.distanceTo(end);
-        const profile: TerrainPoint[] = data.results.map((result: { elevation: number }, index: number) => {
-            const distance = (index / steps) * totalDistance;
-            return {
-                distance,
-                elevation: result.elevation,
-            };
-        });
-    
+        const profile: TerrainPoint[] = data.results.map((r: { elevation: number }, i: number) => ({ distance: (i / steps) * totalDistance, elevation: r.elevation }));
         return { profile, totalDistance };
     };
     
     const calculateLineOfSight = (profile: TerrainPoint[], totalDistance: number, heightA: number, heightB: number): LOSResult => {
-        const startAntennaElevation = profile[0].elevation + heightA;
-        const endAntennaElevation = profile[profile.length - 1].elevation + heightB;
-
+        const startEl = profile[0].elevation + heightA; const endEl = profile[profile.length - 1].elevation + heightB;
         for (let i = 1; i < profile.length - 1; i++) {
-            const point = profile[i];
-            const losHeightAtPoint = startAntennaElevation + (endAntennaElevation - startAntennaElevation) * (point.distance / totalDistance);
-            const curvature = getCurvatureHeight(point.distance, totalDistance);
-            const effectiveTerrainHeight = point.elevation + curvature;
-
-            if (effectiveTerrainHeight > losHeightAtPoint) {
-                return {
-                    isClear: false,
-                    obstruction: {
-                        distance: point.distance,
-                        height: effectiveTerrainHeight,
-                        losHeight: losHeightAtPoint,
-                    },
-                };
-            }
+            const p = profile[i]; const losH = startEl + (endEl - startEl) * (p.distance / totalDistance);
+            const effTerrH = p.elevation + getCurvatureHeight(p.distance, totalDistance);
+            if (effTerrH > losH) return { isClear: false, obstruction: { distance: p.distance, height: effTerrH, losHeight: losH } };
         }
-
         return { isClear: true };
     };
 
-    const calculateRadioLink = (totalDistanceMeters: number, specs: RadioSpecs): RadioLinkResult => {
-        const distanceKm = totalDistanceMeters / 1000;
-        const pathLoss = 20 * Math.log10(distanceKm) + 20 * Math.log10(specs.frequency) + 32.44;
-        const receivedSignalStrength = specs.txPower - pathLoss + specs.txAntennaGain + specs.rxAntennaGain;
-        const linkMargin = receivedSignalStrength - specs.rxSensitivity;
-    
-        return {
-            isViable: linkMargin > 0,
-            distance: parseFloat(distanceKm.toFixed(2)),
-            pathLoss: parseFloat(pathLoss.toFixed(2)),
-            receivedSignalStrength: parseFloat(receivedSignalStrength.toFixed(2)),
-            linkMargin: parseFloat(linkMargin.toFixed(2)),
-        };
+    const calculateRadioLink = (totalDistance: number, specs: RadioSpecs): RadioLinkResult => {
+        const distKm = totalDistance / 1000; const pathLoss = 20 * Math.log10(distKm) + 20 * Math.log10(specs.frequency) + 32.44;
+        const rssi = specs.txPower - pathLoss + specs.txAntennaGain + specs.rxAntennaGain; const margin = rssi - specs.rxSensitivity;
+        return { isViable: margin > 0, distance: +distKm.toFixed(2), pathLoss: +pathLoss.toFixed(2), receivedSignalStrength: +rssi.toFixed(2), linkMargin: +margin.toFixed(2) };
     };
 
     const handleAnalyze = async () => {
-        if (!points[0] || !points[1]) {
-            setError("Please select two points on the map.");
-            return;
-        }
-
-        setIsLoading(true);
-        setError(null);
-        setTerrainProfile(null);
-        setLosResult(null);
-        setRadioLinkResult(null);
-        setConstraintSegments([]);
-
+        if (!points[0] || !points[1]) { setError("Please select two points on the map."); return; }
+        setIsLoading(true); setError(null); setTerrainProfile(null); setLosResult(null); setRadioLinkResult(null); setConstraintSegments([]);
         try {
-            const { profile, totalDistance } = await fetchTerrainProfile(points[0], points[1]);
-            setTerrainProfile(profile);
-
-            const result = calculateLineOfSight(profile, totalDistance, antennaHeights[0], antennaHeights[1]);
-            setLosResult(result);
-            
-            if (useRadioSpecs && result.isClear) {
-                const radioResult = calculateRadioLink(totalDistance, radioSpecs);
-                setRadioLinkResult(radioResult);
-            }
-
-            const startAntennaElevation = profile[0].elevation + antennaHeights[0];
-            const endAntennaElevation = profile[profile.length - 1].elevation + antennaHeights[1];
-            
-            const segments: ConstraintPoint[][] = [];
-            let currentSegment: ConstraintPoint[] = [];
-
+            const { profile, totalDistance } = await fetchTerrainProfile(points[0], points[1]); setTerrainProfile(profile);
+            const result = calculateLineOfSight(profile, totalDistance, antennaHeights[0], antennaHeights[1]); setLosResult(result);
+            if (useRadioSpecs && result.isClear) { setRadioLinkResult(calculateRadioLink(totalDistance, radioSpecs)); }
+            const startEl = profile[0].elevation + antennaHeights[0]; const endEl = profile[profile.length - 1].elevation + antennaHeights[1];
+            const segments: ConstraintPoint[][] = []; let currentSegment: ConstraintPoint[] = [];
             for (let i = 0; i < profile.length; i++) {
-                const point = profile[i];
-                const losHeightAtPoint = startAntennaElevation + (endAntennaElevation - startAntennaElevation) * (point.distance / totalDistance);
-                const curvature = getCurvatureHeight(point.distance, totalDistance);
-                const effectiveTerrainHeight = point.elevation + curvature;
-                const clearance = losHeightAtPoint - effectiveTerrainHeight;
-                
+                const p = profile[i]; const losH = startEl + (endEl - startEl) * (p.distance / totalDistance);
+                const effTerrH = p.elevation + getCurvatureHeight(p.distance, totalDistance); const clearance = losH - effTerrH;
                 let type: ConstraintPoint['type'] | null = null;
-                if (clearance < -10) type = 'severe_obstruction';
-                else if (clearance < 0) type = 'obstruction';
-                else if (clearance < 10) type = 'clearance';
-
-                const currentSegmentType = currentSegment.length > 0 ? currentSegment[0].type : null;
-                
-                if (type !== currentSegmentType) {
-                    if (currentSegment.length > 1) segments.push(currentSegment);
-                    currentSegment = [];
-
+                if (clearance < -10) type = 'severe_obstruction'; else if (clearance < 0) type = 'obstruction'; else if (clearance < 10) type = 'clearance';
+                if (type !== (currentSegment[0]?.type ?? null)) {
+                    if (currentSegment.length > 1) segments.push(currentSegment); currentSegment = [];
                     if (type !== null && i > 0) {
-                        const prevPoint = profile[i-1];
-                        const prevLosHeight = startAntennaElevation + (endAntennaElevation - startAntennaElevation) * (prevPoint.distance / totalDistance);
-                        const prevCurvature = getCurvatureHeight(prevPoint.distance, totalDistance);
-                        const prevClearance = prevLosHeight - (prevPoint.elevation + prevCurvature);
-                        
-                        const fraction = totalDistance > 0 ? prevPoint.distance / totalDistance : 0;
-                        const lat = points[0]!.lat + (points[1]!.lat - points[0]!.lat) * fraction;
-                        const lng = points[0]!.lng + (points[1]!.lng - points[0]!.lng) * fraction;
-                        currentSegment.push({ latlng: new LatLng(lat, lng), type, value: prevClearance, distance: prevPoint.distance });
+                        const prev = profile[i-1]; const prevLosH = startEl + (endEl - startEl) * (prev.distance / totalDistance);
+                        const prevClearance = prevLosH - (prev.elevation + getCurvatureHeight(prev.distance, totalDistance));
+                        const frac = totalDistance > 0 ? prev.distance / totalDistance : 0;
+                        currentSegment.push({ latlng: new LatLng(points[0]!.lat + (points[1]!.lat - points[0]!.lat) * frac, points[0]!.lng + (points[1]!.lng - points[0]!.lng) * frac), type, value: prevClearance, distance: prev.distance });
                     }
                 }
-
                 if (type !== null) {
-                    const fraction = totalDistance > 0 ? point.distance / totalDistance : 0;
-                    const lat = points[0]!.lat + (points[1]!.lat - points[0]!.lat) * fraction;
-                    const lng = points[0]!.lng + (points[1]!.lng - points[0]!.lng) * fraction;
-                    currentSegment.push({ latlng: new LatLng(lat, lng), type, value: clearance, distance: point.distance });
+                    const frac = totalDistance > 0 ? p.distance / totalDistance : 0;
+                    currentSegment.push({ latlng: new LatLng(points[0]!.lat + (points[1]!.lat - points[0]!.lat) * frac, points[0]!.lng + (points[1]!.lng - points[0]!.lng) * frac), type, value: clearance, distance: p.distance });
                 }
             }
-            if (currentSegment.length > 1) segments.push(currentSegment);
-            
-            setConstraintSegments(segments);
-
-        } catch (e) {
-            console.error("Analysis failed:", e);
-            const errorMessage = e instanceof Error ? e.message : "An unknown error occurred during analysis.";
-            setError(`Analysis failed. ${errorMessage}`);
-        } finally {
-            setIsLoading(false);
-        }
+            if (currentSegment.length > 1) segments.push(currentSegment); setConstraintSegments(segments);
+        } catch (e) { const msg = e instanceof Error ? e.message : "An unknown error occurred."; setError(`Analysis failed. ${msg}`); } finally { setIsLoading(false); }
     };
 
     return (
-        // FIX 1: Use h-screen for an explicit full viewport height, and overflow-hidden to prevent scrollbars.
-        <div className="h-screen bg-slate-900 text-slate-200 flex flex-col lg:flex-row p-4 gap-4 overflow-hidden">
-            {/* FIX 2: Use CSS Grid to explicitly partition the vertical space. */}
-            <div className="lg:w-3/5 grid grid-rows-[auto_1fr] gap-4">
-                <header>
+        // --- FIX: This is a new, bulletproof layout using CSS Grid for stability. ---
+        <div className="h-screen w-screen bg-slate-900 text-slate-200 grid lg:grid-cols-[3fr_2fr] grid-rows-[auto_1fr] lg:grid-rows-1 gap-4 p-4 overflow-hidden">
+            {/* Header for mobile */}
+            <header className="lg:hidden">
+                <h1 className="text-3xl font-bold text-sky-400">Line of Sight Analyzer</h1>
+                <p className="text-slate-400">Click or drag points on the map and analyze visibility.</p>
+            </header>
+
+            {/* Map Area - this is a more robust way to define the desktop layout */}
+            <div className="lg:col-start-1 lg:row-start-1 flex-col hidden lg:flex">
+                 <header className="mb-4">
                     <h1 className="text-3xl font-bold text-sky-400">Line of Sight Analyzer</h1>
-                    <p className="text-slate-400">Click or drag points on the map, adjust antenna heights, and analyze visibility.</p>
+                    <p className="text-slate-400">Click or drag points on the map and analyze visibility.</p>
                 </header>
-                {/* FIX 3: Remove flex-grow as it's no longer needed. The grid row `1fr` handles the sizing. */}
-                <div className="rounded-lg overflow-hidden border-2 border-slate-700 relative">
+                <div className="flex-grow rounded-lg overflow-hidden border-2 border-slate-700 relative">
                     <MapDisplay 
                         points={points} 
                         onMapClick={handleMapClick}
-                        hoveredLatLng={hoveredLatLng}
-                        onHover={handleHover}
                         onMarkerDrag={handleMarkerDrag}
                         constraintSegments={constraintSegments}
+                        // --- FIX: Hover props are removed ---
                     />
                 </div>
             </div>
-            {/* The right-hand column should be fine as-is. */}
-            <main className="lg:w-2/5 flex flex-col gap-4">
+
+            {/* Control Panel Area */}
+            <main className="lg:col-start-2 lg:row-start-1 flex flex-col gap-4 overflow-y-auto">
                 <ControlPanel
                     antennaHeights={antennaHeights}
                     onHeightChange={setAntennaHeights}
@@ -311,10 +194,9 @@ const App: React.FC = () => {
                     radioLinkResult={radioLinkResult}
                     antennaHeights={antennaHeights}
                     isLoading={isLoading}
-                    hoveredDistance={hoveredDistance}
-                    onHover={handleHover}
                     useCurvature={useCurvature}
                     constraintSegments={constraintSegments}
+                    // --- FIX: Hover props are removed ---
                 />
             </main>
         </div>
