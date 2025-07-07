@@ -3,60 +3,47 @@
  * This is the main stylesheet for your application.
 */
 
-/* 1. Import the required Leaflet styles */
-/* This is crucial for the map container, tiles, and controls to render correctly. */
-@import 'leaflet/dist/leaflet.css';
-
-
-/* ================== FIX START ================== */
-/*
-  This block creates an unbroken "height chain" from the top of the document
-  down to your React app's root element (#root). This ensures that when you
-  use `h-full` or flexbox tries to stretch an item, it has a valid, defined
-  height to refer to. This is a best-practice for full-page web applications
-  and should resolve the layout collapsing issue.
-*/
+/* 1. Establish the foundational layout for the entire page */
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden; /* Prevents unwanted scrollbars on the body */
+  overflow: hidden;
 }
-/* =================== FIX END =================== */
 
+/* 2. Import the required Leaflet styles via the build process */
+@import 'leaflet/dist/leaflet.css';
 
-/* 2. Inject Tailwind's base, components, and utility styles */
-/* These directives are processed by Tailwind to generate all the utility classes you use in your components. */
+/* 3. Inject Tailwind's base, components, and utility styles */
+/* These directives will now be correctly processed by your build tools. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 3. Add any custom global styles or animations here */
-/* We can add the styles for your 'pulsing-icon' class from MapDisplay.tsx here. */
+/* 4. Add any custom global styles or animations here */
 @layer components {
   .pulsing-icon {
-    background-color: #38bdf8; /* This is Tailwind's sky-500 color */
+    background-color: #fb923c; /* orange-400 */
     border-radius: 50%;
-    box-shadow: 0 0 0 0 rgba(56, 189, 248, 1);
-    /* The animation will create the pulsing effect */
-    animation: pulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+    border: 2px solid white;
+    box-shadow: 0 0 8px rgba(0,0,0,0.6);
+    animation: pulse-animation 1.75s infinite ease-out;
   }
 }
 
-/* Defines the keyframes for the 'pulse' animation */
-@keyframes pulse {
+@keyframes pulse-animation {
   0% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7);
+    transform: scale(0.8);
+    box-shadow: 0 0 0 0 rgba(251, 146, 60, 0.7);
   }
   70% {
-    transform: scale(1);
-    box-shadow: 0 0 0 12px rgba(56, 189, 248, 0);
+    transform: scale(1.2);
+    box-shadow: 0 0 0 12px rgba(251, 146, 60, 0);
   }
   100% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
+    transform: scale(0.8);
+    box-shadow: 0 0 0 0 rgba(251, 146, 60, 0);
   }
 }
