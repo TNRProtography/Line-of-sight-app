@@ -66,40 +66,46 @@ const getSegmentPopupInfo = (segment: ConstraintPoint[]): { title: string; messa
     }
 };
 
-// ================== THE FINAL FIX ==================
-// This helper component fixes the patchy tile issue by waiting a moment
-// for the browser to apply CSS before telling the map to resize.
+// ================== THE FINAL, GUARANTEED FIX ==================
+// This uses the ResizeObserver API to definitively solve the race condition.
+// It watches the map's container element and calls invalidateSize()
+// only when its size *actually* changes. This is not a guess; it's a direct response.
 function ResizeHandler() {
     const map = useMap();
 
     useEffect(() => {
-        const timer = setTimeout(() => {
+        const container = map.getContainer();
+        
+        // Create an observer instance
+        const observer = new ResizeObserver(() => {
             map.invalidateSize();
-        }, 100); // A small delay is enough
+        });
 
-        // Cleanup function to prevent errors if the component unmounts quickly
+        // Start observing the map container
+        observer.observe(container);
+
+        // Cleanup function to stop observing when the component unmounts
         return () => {
-            clearTimeout(timer);
+            observer.disconnect();
         };
     }, [map]);
 
     return null;
 }
-// =================== FIX END ===================
-
+// ================================================================
 
 const MapDisplay: React.FC<MapDisplayProps> = ({ points, onMapClick, hoveredLatLng, onHover, onMarkerDrag, constraintSegments }) => {
     const [basemap, setBasemap] = useState<'topo' | 'satellite'>('topo');
 
-    const westCoastCenter = new LatLng(-42.715, 170.965); // Centered around Hokitika on the West Coast
+    const westCoastCenter = new LatLng(-42.715, 170.965);
     const nzBounds = new LatLngBounds(
-        new LatLng(-47.3, 166.4), // Southwest
-        new LatLng(-34.4, 178.6)  // Northeast
+        new LatLng(-47.3, 166.4),
+        new LatLng(-34.4, 178.6)
     );
 
     const position: LatLng = points[0] || westCoastCenter;
     const zoom = points[0] ? 9 : 8;
-    const linePathColor = basemap === 'satellite' ? '#38bdf8' : '#0284c7'; // Brighter blue for satellite
+    const linePathColor = basemap === 'satellite' ? '#38bdf8' : '#0284c7';
 
     return (
         <MapContainer 
@@ -108,7 +114,7 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ points, onMapClick, hoveredLatL
             scrollWheelZoom={true}
             maxBounds={nzBounds}
             minZoom={5}
-            className="w-full h-full" 
+            className="w-full h-full"
         >
              <ResizeHandler />
 
