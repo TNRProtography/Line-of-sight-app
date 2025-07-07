@@ -268,17 +268,16 @@ const App: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 text-slate-200 flex flex-col lg:flex-row p-4 gap-4">
-            {/* ================== FIX START ================== */}
-            {/* The problematic classes 'h-[50vh]' and 'lg:h-auto' have been removed. */}
-            {/* This allows the div to properly stretch and fill the height of its parent flex container. */}
-            <div className="lg:w-3/5 flex flex-col gap-4">
-            {/* =================== FIX END =================== */}
+        // FIX 1: Use h-screen for an explicit full viewport height, and overflow-hidden to prevent scrollbars.
+        <div className="h-screen bg-slate-900 text-slate-200 flex flex-col lg:flex-row p-4 gap-4 overflow-hidden">
+            {/* FIX 2: Use CSS Grid to explicitly partition the vertical space. */}
+            <div className="lg:w-3/5 grid grid-rows-[auto_1fr] gap-4">
                 <header>
                     <h1 className="text-3xl font-bold text-sky-400">Line of Sight Analyzer</h1>
                     <p className="text-slate-400">Click or drag points on the map, adjust antenna heights, and analyze visibility.</p>
                 </header>
-                <div className="flex-grow rounded-lg overflow-hidden border-2 border-slate-700 relative">
+                {/* FIX 3: Remove flex-grow as it's no longer needed. The grid row `1fr` handles the sizing. */}
+                <div className="rounded-lg overflow-hidden border-2 border-slate-700 relative">
                     <MapDisplay 
                         points={points} 
                         onMapClick={handleMapClick}
@@ -289,6 +288,7 @@ const App: React.FC = () => {
                     />
                 </div>
             </div>
+            {/* The right-hand column should be fine as-is. */}
             <main className="lg:w-2/5 flex flex-col gap-4">
                 <ControlPanel
                     antennaHeights={antennaHeights}
