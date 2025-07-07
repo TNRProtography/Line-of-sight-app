@@ -1,7 +1,14 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+
+// ================== FIX START ==================
+// Import the main stylesheet for the application.
+// This file contains the necessary styles for Leaflet and generates
+// all the Tailwind CSS classes used throughout the app. This is the crucial
+// step that makes the map and the rest of the UI render correctly.
+import './index.css';
+// =================== FIX END ===================
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
