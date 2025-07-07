@@ -7,6 +7,26 @@
 /* This is crucial for the map container, tiles, and controls to render correctly. */
 @import 'leaflet/dist/leaflet.css';
 
+
+/* ================== FIX START ================== */
+/*
+  This block creates an unbroken "height chain" from the top of the document
+  down to your React app's root element (#root). This ensures that when you
+  use `h-full` or flexbox tries to stretch an item, it has a valid, defined
+  height to refer to. This is a best-practice for full-page web applications
+  and should resolve the layout collapsing issue.
+*/
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Prevents unwanted scrollbars on the body */
+}
+/* =================== FIX END =================== */
+
+
 /* 2. Inject Tailwind's base, components, and utility styles */
 /* These directives are processed by Tailwind to generate all the utility classes you use in your components. */
 @tailwind base;
