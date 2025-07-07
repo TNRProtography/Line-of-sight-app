@@ -1,6 +1,5 @@
-
-import React, { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Polyline, useMapEvents, Popup } from 'react-leaflet';
+import React, { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Polyline, useMapEvents, Popup, useMap } from 'react-leaflet';
 import { LatLng, LatLngBounds, divIcon } from 'leaflet';
 import { Map, Globe } from 'lucide-react';
 import type { ConstraintPoint } from '../types';
@@ -67,6 +66,28 @@ const getSegmentPopupInfo = (segment: ConstraintPoint[]): { title: string; messa
     }
 };
 
+// ================== THE FINAL FIX ==================
+// This helper component fixes the patchy tile issue by waiting a moment
+// for the browser to apply CSS before telling the map to resize.
+function ResizeHandler() {
+    const map = useMap();
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            map.invalidateSize();
+        }, 100); // A small delay is enough
+
+        // Cleanup function to prevent errors if the component unmounts quickly
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [map]);
+
+    return null;
+}
+// =================== FIX END ===================
+
+
 const MapDisplay: React.FC<MapDisplayProps> = ({ points, onMapClick, hoveredLatLng, onHover, onMarkerDrag, constraintSegments }) => {
     const [basemap, setBasemap] = useState<'topo' | 'satellite'>('topo');
 
@@ -87,7 +108,10 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ points, onMapClick, hoveredLatL
             scrollWheelZoom={true}
             maxBounds={nzBounds}
             minZoom={5}
+            className="w-full h-full" 
         >
+             <ResizeHandler />
+
              <div className="absolute top-2 right-2 z-[1000] bg-slate-800/80 p-1 rounded-md border border-slate-600 shadow-lg flex">
                 <button 
                     onClick={() => setBasemap('topo')} 
@@ -109,12 +133,12 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ points, onMapClick, hoveredLatL
 
             {basemap === 'topo' ? (
                 <TileLayer
-                    attribution='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org/dem3.html">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+                    attribution='Map data: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org/dem3.html">SRTM</a> | Map style: © <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
                     url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
                 />
             ) : (
                 <TileLayer
-                    attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                    attribution='Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
                     url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
                     maxZoom={18}
                 />
