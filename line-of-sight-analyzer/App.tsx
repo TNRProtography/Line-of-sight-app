@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo } from 'react';
 import { LatLng } from 'leaflet';
 import MapDisplay from './components/MapDisplay';
@@ -7,6 +6,7 @@ import ResultDisplay from './components/ResultDisplay';
 import type { LOSResult, TerrainPoint, ConstraintPoint, RadioSpecs, RadioLinkResult } from './types';
 
 const App: React.FC = () => {
+    // ... all of your state and handlers remain exactly the same ...
     const [points, setPoints] = useState<[LatLng | null, LatLng | null]>([null, null]);
     const [antennaHeights, setAntennaHeights] = useState<[number, number]>([10, 10]);
     const [radioSpecs, setRadioSpecs] = useState<RadioSpecs>({
@@ -96,15 +96,13 @@ const App: React.FC = () => {
     const getCurvatureHeight = useCallback((distance: number, totalDistance: number): number => {
         if (!useCurvature || totalDistance === 0) return 0;
         
-        // Using the 4/3 Earth radius model (k-factor) for standard atmospheric refraction
-        const R_e = 6371000; // Earth's mean radius in meters
+        const R_e = 6371000;
         const K = 4 / 3;
         const effectiveRadius = R_e * K;
     
         const d1 = distance;
         const d2 = totalDistance - d1;
     
-        // h = (d1 * d2) / (2 * K * R_e)
         return (d1 * d2) / (2 * effectiveRadius);
     }, [useCurvature]);
 
@@ -174,14 +172,8 @@ const App: React.FC = () => {
 
     const calculateRadioLink = (totalDistanceMeters: number, specs: RadioSpecs): RadioLinkResult => {
         const distanceKm = totalDistanceMeters / 1000;
-        
-        // Free Space Path Loss (FSPL) in dB, for d in km and f in MHz
         const pathLoss = 20 * Math.log10(distanceKm) + 20 * Math.log10(specs.frequency) + 32.44;
-    
-        // Received Signal Strength Indicator (RSSI) in dBm
         const receivedSignalStrength = specs.txPower - pathLoss + specs.txAntennaGain + specs.rxAntennaGain;
-        
-        // Link Margin in dB
         const linkMargin = receivedSignalStrength - specs.rxSensitivity;
     
         return {
@@ -232,28 +224,21 @@ const App: React.FC = () => {
                 const clearance = losHeightAtPoint - effectiveTerrainHeight;
                 
                 let type: ConstraintPoint['type'] | null = null;
-                if (clearance < -10) {
-                    type = 'severe_obstruction';
-                } else if (clearance < 0) {
-                    type = 'obstruction';
-                } else if (clearance < 10) {
-                    type = 'clearance';
-                }
+                if (clearance < -10) type = 'severe_obstruction';
+                else if (clearance < 0) type = 'obstruction';
+                else if (clearance < 10) type = 'clearance';
 
                 const currentSegmentType = currentSegment.length > 0 ? currentSegment[0].type : null;
                 
                 if (type !== currentSegmentType) {
-                    if (currentSegment.length > 1) {
-                        segments.push(currentSegment);
-                    }
+                    if (currentSegment.length > 1) segments.push(currentSegment);
                     currentSegment = [];
 
                     if (type !== null && i > 0) {
                         const prevPoint = profile[i-1];
                         const prevLosHeight = startAntennaElevation + (endAntennaElevation - startAntennaElevation) * (prevPoint.distance / totalDistance);
                         const prevCurvature = getCurvatureHeight(prevPoint.distance, totalDistance);
-                        const prevEffectiveTerrainHeight = prevPoint.elevation + prevCurvature;
-                        const prevClearance = prevLosHeight - prevEffectiveTerrainHeight;
+                        const prevClearance = prevLosHeight - (prevPoint.elevation + prevCurvature);
                         
                         const fraction = totalDistance > 0 ? prevPoint.distance / totalDistance : 0;
                         const lat = points[0]!.lat + (points[1]!.lat - points[0]!.lat) * fraction;
@@ -266,13 +251,10 @@ const App: React.FC = () => {
                     const fraction = totalDistance > 0 ? point.distance / totalDistance : 0;
                     const lat = points[0]!.lat + (points[1]!.lat - points[0]!.lat) * fraction;
                     const lng = points[0]!.lng + (points[1]!.lng - points[0]!.lng) * fraction;
-                    const latlng = new LatLng(lat, lng);
-                    currentSegment.push({ latlng, type, value: clearance, distance: point.distance });
+                    currentSegment.push({ latlng: new LatLng(lat, lng), type, value: clearance, distance: point.distance });
                 }
             }
-            if (currentSegment.length > 1) {
-                segments.push(currentSegment);
-            }
+            if (currentSegment.length > 1) segments.push(currentSegment);
             
             setConstraintSegments(segments);
 
@@ -287,7 +269,11 @@ const App: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-slate-900 text-slate-200 flex flex-col lg:flex-row p-4 gap-4">
-            <div className="lg:w-3/5 flex flex-col gap-4 h-[50vh] lg:h-auto">
+            {/* ================== FIX START ================== */}
+            {/* The problematic classes 'h-[50vh]' and 'lg:h-auto' have been removed. */}
+            {/* This allows the div to properly stretch and fill the height of its parent flex container. */}
+            <div className="lg:w-3/5 flex flex-col gap-4">
+            {/* =================== FIX END =================== */}
                 <header>
                     <h1 className="text-3xl font-bold text-sky-400">Line of Sight Analyzer</h1>
                     <p className="text-slate-400">Click or drag points on the map, adjust antenna heights, and analyze visibility.</p>

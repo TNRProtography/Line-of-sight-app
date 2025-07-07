@@ -1,0 +1,42 @@
+/*
+ * index.css
+ * This is the main stylesheet for your application.
+*/
+
+/* 1. Import the required Leaflet styles */
+/* This is crucial for the map container, tiles, and controls to render correctly. */
+@import 'leaflet/dist/leaflet.css';
+
+/* 2. Inject Tailwind's base, components, and utility styles */
+/* These directives are processed by Tailwind to generate all the utility classes you use in your components. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 3. Add any custom global styles or animations here */
+/* We can add the styles for your 'pulsing-icon' class from MapDisplay.tsx here. */
+@layer components {
+  .pulsing-icon {
+    background-color: #38bdf8; /* This is Tailwind's sky-500 color */
+    border-radius: 50%;
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 1);
+    /* The animation will create the pulsing effect */
+    animation: pulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+  }
+}
+
+/* Defines the keyframes for the 'pulse' animation */
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 12px rgba(56, 189, 248, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
+  }
+}
